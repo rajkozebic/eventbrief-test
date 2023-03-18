@@ -7,8 +7,8 @@ export const getMeetings = async (page) => {
       method: "GET",
       url: `${process.env.NEXT_PUBLIC_SERVER}/meetings`,
       params: {
-        page
-      }
+        page,
+      },
     });
     return data;
   } catch (err) {
@@ -37,7 +37,7 @@ export const createMeeting = async (form) => {
     const { data } = await axios({
       method: "POST",
       url: `${process.env.NEXT_PUBLIC_SERVER}/meetings`,
-      data: form
+      data: form,
     });
     return data;
   } catch (err) {
@@ -52,7 +52,7 @@ export const updateMeeting = async (id, form) => {
     const { data } = await axios({
       method: "PUT",
       url: `${process.env.NEXT_PUBLIC_SERVER}/meetings/${id}`,
-      data: form
+      data: form,
     });
     return data;
   } catch (err) {
@@ -67,7 +67,7 @@ export const deleteMeeting = async (ids) => {
     const { data } = await axios({
       method: "DELETE",
       url: `${process.env.NEXT_PUBLIC_SERVER}/meetings`,
-      data: ids
+      data: ids,
     });
     return data;
   } catch (err) {

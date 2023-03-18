@@ -2,16 +2,26 @@ import { Request, Response, NextFunction } from 'express';
 import * as hubspot from '@hubspot/api-client';
 import { initializeApp } from 'firebase/app';
 import { firebaseConfig } from '../config/firebaseConfig';
-import { getFirestore, collection, getDocs, addDoc, doc, query, where, updateDoc, deleteDoc } from "@firebase/firestore";
-import {seedData} from "../utils/mock";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  addDoc,
+  doc,
+  query,
+  where,
+  updateDoc,
+  deleteDoc,
+} from '@firebase/firestore';
+import { seedData } from '../utils/mock';
 
 const properties = [
-  "hs_meeting_title",
-  "hs_meeting_body",
-  "hs_internal_meeting_notes",
-  "hs_meeting_external_url",
-  "hs_meeting_start_time",
-  "hubspot_owner_id"
+  'hs_meeting_title',
+  'hs_meeting_body',
+  'hs_internal_meeting_notes',
+  'hs_meeting_external_url',
+  'hs_meeting_start_time',
+  'hubspot_owner_id',
 ];
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -19,13 +29,14 @@ const firestore = getFirestore(firebaseApp);
 
 export async function list(req: Request, res: Response, next: NextFunction) {
   const page = req.query.page as string | undefined;
-  const hubspotClient = new hubspot.Client({ "accessToken": process.env.PrivateAppToken });
+  const hubspotClient = new hubspot.Client({
+    accessToken: process.env.PrivateAppToken,
+  });
 
   // integrate firebase
-
-  const coll = collection(firestore, 'meetings')
+  const coll = collection(firestore, 'meetings');
   const response = await getDocs(coll);
-  const list = response.docs.map(doc => doc.data());
+  const meetingsInFirestore = response.docs.map((doc) => doc.data());
 
   const limit = 100;
   const after = page;
@@ -34,7 +45,15 @@ export async function list(req: Request, res: Response, next: NextFunction) {
   const archived = false;
 
   try {
-    const apiResponse = await hubspotClient.crm.objects.meetings.basicApi.getPage(limit, after, properties, propertiesWithHistory, associations, archived);
+    const apiResponse =
+      await hubspotClient.crm.objects.meetings.basicApi.getPage(
+        limit,
+        after,
+        properties,
+        propertiesWithHistory,
+        associations,
+        archived
+      );
     const data = apiResponse?.results.map((res) => {
       return {
         id: res.id,
@@ -47,9 +66,27 @@ export async function list(req: Request, res: Response, next: NextFunction) {
         startTime: res.properties.hs_meeting_start_time,
         createdAt: res.createdAt,
         updatedAt: res.updatedAt,
-        archived: res.archived
+        archived: res.archived,
+      };
+    });
+
+    // Hubspot being source of truth
+
+    for (const meeting of data) {
+      if (
+        !meetingsInFirestore.find(
+          (meetingInFireStore) => meetingInFireStore.hubId === meeting.id
+        )
+      ) {
+        await addDoc(coll, {
+          account: meeting.account,
+          time: meeting.startTime,
+          title: meeting.title,
+          description: meeting.body,
+          hubId: meeting.id,
+        });
       }
-    })
+    }
 
     res.json({
       data: data,
@@ -61,13 +98,17 @@ export async function list(req: Request, res: Response, next: NextFunction) {
 
 export async function get(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params;
-  const hubspotClient = new hubspot.Client({ "accessToken": process.env.PrivateAppToken });
+  const hubspotClient = new hubspot.Client({
+    accessToken: process.env.PrivateAppToken,
+  });
 
   // integrate firebase
-  const leaseQuery = query(collection(firestore, 'meetings'), where('hubId', "==", id))
+  const leaseQuery = query(
+    collection(firestore, 'meetings'),
+    where('hubId', '==', id)
+  );
   const response = await getDocs(leaseQuery);
-  const list = response.docs.map(doc => doc.data());
-
+  const list = response.docs.map((doc) => doc.data());
 
   const meetingId = id;
   const propertiesWithHistory = undefined;
@@ -76,7 +117,15 @@ export async function get(req: Request, res: Response, next: NextFunction) {
   const idProperty = undefined;
 
   try {
-    const apiResponse = await hubspotClient.crm.objects.meetings.basicApi.getById(meetingId, properties, propertiesWithHistory, associations, archived, idProperty);
+    const apiResponse =
+      await hubspotClient.crm.objects.meetings.basicApi.getById(
+        meetingId,
+        properties,
+        propertiesWithHistory,
+        associations,
+        archived,
+        idProperty
+      );
 
     const data = {
       id: apiResponse.id,
@@ -90,11 +139,11 @@ export async function get(req: Request, res: Response, next: NextFunction) {
       startTime: apiResponse.properties.hs_meeting_start_time,
       createdAt: apiResponse.createdAt,
       updatedAt: apiResponse.updatedAt,
-      archived: apiResponse.archived
-    }
+      archived: apiResponse.archived,
+    };
 
     res.json({
-      data
+      data,
     });
   } catch (err) {
     next(err);
@@ -104,19 +153,24 @@ export async function get(req: Request, res: Response, next: NextFunction) {
 export async function update(req: Request, res: Response, next: NextFunction) {
   const { id } = req.params;
   const info = req.body;
-  const hubspotClient = new hubspot.Client({ "accessToken": process.env.PrivateAppToken });
-
-  // integrate firebase
-  const leaseQuery = query(collection(firestore, 'meetings'), where('hubId', "==", id));
-  const response = await getDocs(leaseQuery);
-  const list = response.docs.map(doc => {
-    return {
-      id: doc.id,
-      ...doc.data()
-    }
+  const hubspotClient = new hubspot.Client({
+    accessToken: process.env.PrivateAppToken,
   });
 
-  const updateMeeting = doc(firestore, 'meetings', list[0].id)
+  // integrate firebase
+  const leaseQuery = query(
+    collection(firestore, 'meetings'),
+    where('hubId', '==', id)
+  );
+  const response = await getDocs(leaseQuery);
+  const list = response.docs.map((doc) => {
+    return {
+      id: doc.id,
+      ...doc.data(),
+    };
+  });
+
+  const updateMeeting = doc(firestore, 'meetings', list[0].id);
 
   const firebaseRes = await updateDoc(updateMeeting, {
     title: info.title,
@@ -125,16 +179,21 @@ export async function update(req: Request, res: Response, next: NextFunction) {
   });
 
   const updateBody = {
-    "hs_meeting_title": info.title,
-    "hs_meeting_body": info.nextSteps,
-    "hs_meeting_start_time": (+new Date(info.startTime)).toString(),
+    hs_meeting_title: info.title,
+    hs_meeting_body: info.nextSteps,
+    hs_meeting_start_time: (+new Date(info.startTime)).toString(),
   };
   const SimplePublicObjectInput = { properties: updateBody };
   const meetingId = id;
   const idProperty = undefined;
 
   try {
-    const apiResponse = await hubspotClient.crm.objects.meetings.basicApi.update(meetingId, SimplePublicObjectInput, idProperty);
+    const apiResponse =
+      await hubspotClient.crm.objects.meetings.basicApi.update(
+        meetingId,
+        SimplePublicObjectInput,
+        idProperty
+      );
     const data = {
       id: apiResponse.id,
       createData: apiResponse.properties.hs_createdate,
@@ -147,11 +206,11 @@ export async function update(req: Request, res: Response, next: NextFunction) {
       startTime: apiResponse.properties.hs_meeting_start_time,
       createdAt: apiResponse.createdAt,
       updatedAt: apiResponse.updatedAt,
-      archived: apiResponse.archived
-    }
+      archived: apiResponse.archived,
+    };
 
     res.json({
-      data
+      data,
     });
   } catch (err) {
     next(err);
@@ -160,29 +219,35 @@ export async function update(req: Request, res: Response, next: NextFunction) {
 
 export async function remove(req: Request, res: Response, next: NextFunction) {
   const ids = req.body;
-  const hubspotClient = new hubspot.Client({ "accessToken": process.env.PrivateAppToken });
+  const hubspotClient = new hubspot.Client({
+    accessToken: process.env.PrivateAppToken,
+  });
 
   try {
-    for(const id of ids) {
-      const apiResponse = await hubspotClient.crm.objects.meetings.basicApi.archive(id);
+    for (const id of ids) {
+      const apiResponse =
+        await hubspotClient.crm.objects.meetings.basicApi.archive(id);
       console.log(JSON.stringify(apiResponse, null, 2));
 
-      const leaseQuery = query(collection(firestore, 'meetings'), where('hubId', "==", id))
+      const leaseQuery = query(
+        collection(firestore, 'meetings'),
+        where('hubId', '==', id)
+      );
       const response = await getDocs(leaseQuery);
-      const list = response.docs.map(doc => {
+      const list = response.docs.map((doc) => {
         return {
           id: doc.id,
-          ...doc.data()
-        }
+          ...doc.data(),
+        };
       });
 
-      const deleteMeeting = doc(firestore, 'meetings', list[0].id)
+      const deleteMeeting = doc(firestore, 'meetings', list[0].id);
 
       const firebaseRes = await deleteDoc(deleteMeeting);
     }
 
     res.json({
-      data: true
+      data: true,
     });
   } catch (err) {
     next(err);
@@ -190,12 +255,17 @@ export async function remove(req: Request, res: Response, next: NextFunction) {
 }
 
 export async function create(req: Request, res: Response, next: NextFunction) {
-  const hubspotClient = new hubspot.Client({ "accessToken": process.env.PrivateAppToken });
+  const hubspotClient = new hubspot.Client({
+    accessToken: process.env.PrivateAppToken,
+  });
 
   try {
-    for(const data of seedData) {
+    for (const data of seedData) {
       const SimplePublicObjectInputForCreate = { properties: data };
-      const hubResponse = await hubspotClient.crm.objects.meetings.basicApi.create(SimplePublicObjectInputForCreate);
+      const hubResponse =
+        await hubspotClient.crm.objects.meetings.basicApi.create(
+          SimplePublicObjectInputForCreate
+        );
 
       const coll = collection(firestore, 'meetings');
       const response = await addDoc(coll, {
@@ -203,12 +273,12 @@ export async function create(req: Request, res: Response, next: NextFunction) {
         time: hubResponse.properties.hs_meeting_start_time,
         title: hubResponse.properties.hs_meeting_title,
         description: hubResponse.properties.hs_meeting_body,
-        hubId: hubResponse.id
+        hubId: hubResponse.id,
       });
     }
 
     res.json({
-      data: true
+      data: true,
     });
   } catch (err) {
     next(err);

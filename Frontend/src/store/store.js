@@ -1,6 +1,6 @@
-import { configureStore } from '@reduxjs/toolkit'
-import { meetingSlice } from './common'
-import { createWrapper } from 'next-redux-wrapper'
+import { configureStore } from "@reduxjs/toolkit";
+import { meetingSlice } from "./common";
+import { createWrapper } from "next-redux-wrapper";
 
 const makeStore = () =>
   configureStore({

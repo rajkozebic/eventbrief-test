@@ -1,10 +1,10 @@
-import { createSlice } from '@reduxjs/toolkit'
-import { HYDRATE } from 'next-redux-wrapper'
+import { createSlice } from "@reduxjs/toolkit";
+import { HYDRATE } from "next-redux-wrapper";
 
 // Initial state
 const initialState = {
   lists: [],
-  loading: false
+  loading: false,
 };
 
 // Actual Slice
@@ -13,11 +13,11 @@ export const meetingSlice = createSlice({
   initialState,
   reducers: {
     setMeetings(state, action) {
-      state.lists = action.payload
+      state.lists = action.payload;
     },
     setLoading(state, action) {
-      state.loading = action.payload
-    }
+      state.loading = action.payload;
+    },
   },
 
   extraReducers: {

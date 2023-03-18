@@ -4,7 +4,7 @@ import {
   get,
   update,
   remove,
-  create
+  create,
 } from '../controllers/meetings.controller';
 
 const meetingsRouter = Router();
